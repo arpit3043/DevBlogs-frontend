@@ -1,0 +1,148 @@
+import { Link, useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
+import { 
+  Code2, 
+  PenLine, 
+  LayoutDashboard, 
+  UserCircle,
+  Menu,
+  X
+} from "lucide-react";
+import { useState } from "react";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+
+export function Navbar() {
+  const [location] = useLocation();
+  const [isOpen, setIsOpen] = useState(false);
+
+  const navItems = [
+    { label: "Features", href: "/#features" },
+    { label: "Pricing", href: "/#pricing" },
+    { label: "Blog", href: "/blog" },
+  ];
+
+  return (
+    <nav className="border-b border-border/40 bg-background/80 backdrop-blur-md sticky top-0 z-50">
+      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+        <Link href="/">
+          <div className="flex items-center gap-2 cursor-pointer">
+            <div className="h-8 w-8 bg-primary/20 rounded-lg flex items-center justify-center border border-primary/30">
+              <Code2 className="h-5 w-5 text-primary" />
+            </div>
+            <span className="font-display font-bold text-xl tracking-tight">DevLog</span>
+          </div>
+        </Link>
+
+        {/* Desktop Nav */}
+        <div className="hidden md:flex items-center gap-8">
+          {navItems.map((item) => (
+            <a 
+              key={item.href} 
+              href={item.href}
+              className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+            >
+              {item.label}
+            </a>
+          ))}
+        </div>
+
+        <div className="hidden md:flex items-center gap-4">
+          <Link href="/login">
+            <Button variant="ghost" size="sm">Log in</Button>
+          </Link>
+          <Link href="/dashboard">
+            <Button variant="default" size="sm" className="gap-2">
+              <LayoutDashboard className="h-4 w-4" />
+              Dashboard
+            </Button>
+          </Link>
+          <Link href="/editor">
+            <Button variant="outline" size="sm" className="gap-2 border-primary/20 hover:border-primary/50 hover:bg-primary/5">
+              <PenLine className="h-4 w-4" />
+              Write
+            </Button>
+          </Link>
+        </div>
+
+        {/* Mobile Nav */}
+        <div className="md:hidden">
+          <Sheet open={isOpen} onOpenChange={setIsOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent>
+              <div className="flex flex-col gap-6 mt-10">
+                {navItems.map((item) => (
+                  <a 
+                    key={item.href} 
+                    href={item.href}
+                    className="text-lg font-medium"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    {item.label}
+                  </a>
+                ))}
+                <div className="h-px bg-border my-2" />
+                <Link href="/dashboard">
+                  <Button className="w-full justify-start gap-2" variant="secondary" onClick={() => setIsOpen(false)}>
+                    <LayoutDashboard className="h-4 w-4" /> Dashboard
+                  </Button>
+                </Link>
+                <Link href="/editor">
+                  <Button className="w-full justify-start gap-2" onClick={() => setIsOpen(false)}>
+                    <PenLine className="h-4 w-4" /> Start Writing
+                  </Button>
+                </Link>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+      </div>
+    </nav>
+  );
+}
+
+export function Footer() {
+  return (
+    <footer className="bg-card border-t border-border/50 py-12 mt-20">
+      <div className="container mx-auto px-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          <div className="col-span-1 md:col-span-2">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="h-6 w-6 bg-primary/20 rounded flex items-center justify-center border border-primary/30">
+                <Code2 className="h-4 w-4 text-primary" />
+              </div>
+              <span className="font-display font-bold text-lg">DevLog</span>
+            </div>
+            <p className="text-muted-foreground text-sm max-w-sm">
+              The platform for engineering teams to share knowledge, document systems, and build their technical brand.
+            </p>
+          </div>
+          
+          <div>
+            <h4 className="font-medium mb-4 text-sm uppercase tracking-wider text-muted-foreground">Product</h4>
+            <ul className="space-y-2 text-sm">
+              <li><a href="#" className="hover:text-primary transition-colors">Features</a></li>
+              <li><a href="#" className="hover:text-primary transition-colors">Integrations</a></li>
+              <li><a href="#" className="hover:text-primary transition-colors">Pricing</a></li>
+              <li><a href="#" className="hover:text-primary transition-colors">Changelog</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="font-medium mb-4 text-sm uppercase tracking-wider text-muted-foreground">Legal</h4>
+            <ul className="space-y-2 text-sm">
+              <li><a href="#" className="hover:text-primary transition-colors">Privacy</a></li>
+              <li><a href="#" className="hover:text-primary transition-colors">Terms</a></li>
+            </ul>
+          </div>
+        </div>
+        <div className="mt-12 pt-8 border-t border-border/30 text-center text-sm text-muted-foreground">
+          © {new Date().getFullYear()} DevLog Inc. All rights reserved.
+        </div>
+      </div>
+    </footer>
+  );
+}
