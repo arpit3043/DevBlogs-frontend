@@ -3,7 +3,13 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, getTokenFromAuthResponse } from "@/lib/queryClient";
@@ -19,33 +25,51 @@ declare global {
 export default function Login() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [isLoading, setIsLoading] = useState(false);
 
+  const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
 
+  /* =========================
+     Google Sign-In Init (ONCE)
+     ========================= */
   useEffect(() => {
-    // Initialize Google Sign-In
-    if (window.google) {
-      window.google.accounts.id.initialize({
-        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-        callback: handleGoogleCallback,
-      });
-    }
+    if (!window.google) return;
+
+    window.google.accounts.id.initialize({
+      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+      callback: handleGoogleCallback,
+    });
   }, []);
 
+  /* =========================
+     Google Login Callback
+     ========================= */
   const handleGoogleCallback = async (response: any) => {
     try {
-      logger.info("Google login callback received");
-      const apiResponse = await apiRequest("POST", "/api/auth/google-login", { token: response.credential });
+      if (!response?.credential) {
+        throw new Error("No Google credential received");
+      }
+
+      const apiResponse = await apiRequest(
+        "POST",
+        "/api/auth/google-login",
+        { token: response.credential }
+      );
+
       const data = await apiResponse.json();
       const token = getTokenFromAuthResponse(data);
-      if (token) localStorage.setItem("token", token);
+
+      if (!token) throw new Error("Token missing");
+
+      localStorage.setItem("token", token);
+
       toast({
         title: "Login successful",
         description: "Welcome back!",
       });
+
       setLocation("/dashboard");
     } catch (error) {
       logger.error("Google login failed", error);
@@ -57,22 +81,40 @@ export default function Login() {
     }
   };
 
+  /* =========================
+     Email / Phone Login
+     ========================= */
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+
     try {
       const identifier = email || phone;
-      logger.info("Login form submitted", { hasEmail: !!email, hasPhone: !!phone });
-      const response = await apiRequest("POST", API.auth.login, { identifier, password });
+      if (!identifier || !password) {
+        throw new Error("Missing credentials");
+      }
+
+      const response = await apiRequest(
+        "POST",
+        API.auth.login,
+        { identifier, password }
+      );
+
       const data = await response.json();
       const token = getTokenFromAuthResponse(data);
-      if (token) localStorage.setItem("token", token);
+
+      if (!token) throw new Error("Token not received");
+
+      localStorage.setItem("token", token);
+
       toast({
         title: "Login successful",
         description: "Welcome back!",
       });
+
       setLocation("/dashboard");
     } catch (error) {
+      logger.error("Login failed", error);
       toast({
         title: "Login failed",
         description: "Invalid credentials",
@@ -83,6 +125,9 @@ export default function Login() {
     }
   };
 
+  /* =========================
+     Trigger Google Popup
+     ========================= */
   const handleGoogleLogin = () => {
     if (window.google) {
       window.google.accounts.id.prompt();
@@ -96,13 +141,15 @@ export default function Login() {
           <CardTitle>Welcome Back</CardTitle>
           <CardDescription>Sign in to your account</CardDescription>
         </CardHeader>
+
         <CardContent>
           <Tabs defaultValue="email" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="email">Email</TabsTrigger>
               <TabsTrigger value="phone">Phone</TabsTrigger>
             </TabsList>
-            
+
+            {/* EMAIL LOGIN */}
             <TabsContent value="email">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
@@ -113,9 +160,9 @@ export default function Login() {
                     placeholder="Enter your email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    required
                   />
                 </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
                   <Input
@@ -124,15 +171,16 @@ export default function Login() {
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    required
                   />
                 </div>
+
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? "Signing in..." : "Sign In"}
                 </Button>
               </form>
             </TabsContent>
-            
+
+            {/* PHONE LOGIN */}
             <TabsContent value="phone">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
@@ -143,9 +191,9 @@ export default function Login() {
                     placeholder="Enter your phone number"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    required
                   />
                 </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
                   <Input
@@ -154,9 +202,9 @@ export default function Login() {
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    required
                   />
                 </div>
+
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? "Signing in..." : "Sign In"}
                 </Button>
@@ -164,44 +212,30 @@ export default function Login() {
             </TabsContent>
           </Tabs>
 
+          {/* GOOGLE LOGIN */}
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or continue with
+                </span>
               </div>
             </div>
+
             <Button
               variant="outline"
               className="w-full mt-4"
               onClick={handleGoogleLogin}
             >
-              <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
-                <path
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  fill="#4285F4"
-                />
-                <path
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  fill="#34A853"
-                />
-                <path
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                  fill="#FBBC05"
-                />
-                <path
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                  fill="#EA4335"
-                />
-              </svg>
-              Google
+              Continue with Google
             </Button>
           </div>
 
           <div className="mt-4 text-center text-sm">
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <Link href="/register" className="text-primary hover:underline">
               Sign up
             </Link>

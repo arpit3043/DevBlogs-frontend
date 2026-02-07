@@ -55,14 +55,21 @@ export default function Register() {
           title: "Registration successful",
           description: "Please log in with your credentials",
         });
-      }
-    } catch (error) {
-      toast({
-        title: "Registration failed",
-        description: "Please try again",
-        variant: "destructive",
-      });
-    } finally {
+      } 
+    } catch (error: any) {
+        let message = "Please try again";
+      
+        try {
+          const err = await error.response?.json?.();
+          message = err?.error || message;
+        } catch {}
+      
+        toast({
+          title: "Registration failed",
+          description: message,
+          variant: "destructive",
+        });
+      } finally {
       setIsLoading(false);
     }
   };
