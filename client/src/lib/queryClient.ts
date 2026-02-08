@@ -4,31 +4,41 @@ import { logger } from "./logger";
 export const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:8000";
 
+/** Clear session and redirect to login on 401. Call from API client only. */
+function handleUnauthorized() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  const loginPath = "/login";
+  if (typeof window !== "undefined" && window.location.pathname !== loginPath) {
+    window.location.href = loginPath;
+  }
+}
+
 async function throwIfResNotOk(
   res: Response,
   info?: { method: string; url: string }
 ) {
+  if (res.status === 401) {
+    handleUnauthorized();
+    throw new Error("401: Unauthorized");
+  }
   if (!res.ok) {
     let errorBody: any = null;
-
     try {
       errorBody = await res.json();
     } catch {
       errorBody = await res.text();
     }
-
     logger.error("API response not OK", {
       method: info?.method,
       url: info?.url,
       status: res.status,
       body: errorBody,
     });
-
     const message =
       typeof errorBody === "object" && errorBody?.error
         ? errorBody.error
         : res.statusText;
-
     throw new Error(`${res.status}: ${message}`);
   }
 }

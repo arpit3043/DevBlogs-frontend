@@ -3,24 +3,33 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Bold, 
-  Italic, 
-  Link as LinkIcon, 
-  Image as ImageIcon, 
-  Code, 
-  List, 
+import {
+  Bold,
+  Italic,
+  Underline,
+  Link as LinkIcon,
+  Image as ImageIcon,
+  Code,
+  List,
   ListOrdered,
   Sparkles,
   Save,
-  ArrowLeft
+  ArrowLeft,
+  Search,
+  GitBranch,
+  Share2,
+  Quote,
+  Heading1,
+  Heading2,
+  Heading3,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { API } from "@/lib/api";
 import { logger } from "@/lib/logger";
+import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 
 export default function Editor() {
   const { toast } = useToast();
@@ -29,6 +38,123 @@ export default function Editor() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState(`# Introduction\n\nWrite your technical deep dive here...`);
   const [slug, setSlug] = useState("");
+  const [articleStatus, setArticleStatus] = useState<"draft" | "published">("draft");
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [isSeoLoading, setIsSeoLoading] = useState(false);
+  const [seoResult, setSeoResult] = useState<{ seo_topics?: string; meta_title?: string; meta_description?: string; keywords?: string[] } | null>(null);
+  const [diagramTopic, setDiagramTopic] = useState("");
+  const [isDiagramLoading, setIsDiagramLoading] = useState(false);
+  const [crosspostDevto, setCrosspostDevto] = useState(false);
+  const [crosspostMedium, setCrosspostMedium] = useState(false);
+  const [isCrossposting, setIsCrossposting] = useState(false);
+  const [viewMode, setViewMode] = useState<"edit" | "preview">("edit");
+  const contentRef = useRef<HTMLTextAreaElement>(null);
+  const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const getSelection = useCallback((): { start: number; end: number; text: string; before: string; after: string } => {
+    const ta = contentRef.current;
+    if (!ta) return { start: 0, end: 0, text: "", before: "", after: "" };
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const text = content.slice(start, end);
+    return { start, end, text, before: content.slice(0, start), after: content.slice(end) };
+  }, [content]);
+
+  const applyMarkdown = useCallback((wrapBefore: string, wrapAfter: string = wrapBefore) => {
+    const { start, end, text, before, after } = getSelection();
+    const newContent = before + wrapBefore + text + wrapAfter + after;
+    setContent(newContent);
+    setTimeout(() => {
+      contentRef.current?.focus();
+      const newPos = start + wrapBefore.length + text.length;
+      contentRef.current?.setSelectionRange(newPos, newPos);
+    }, 0);
+  }, [getSelection]);
+
+  const insertAtLineStart = useCallback((prefix: string) => {
+    const { start, before, after } = getSelection();
+    const lineStart = before.lastIndexOf("\n") + 1;
+    const newBefore = before.slice(0, lineStart) + prefix + before.slice(lineStart);
+    setContent(newBefore + after);
+    setTimeout(() => contentRef.current?.focus(), 0);
+  }, [getSelection]);
+
+  const handleBold = () => applyMarkdown("**");
+  const handleItalic = () => applyMarkdown("*");
+  const handleUnderline = () => applyMarkdown("<u>", "</u>");
+  const handleCode = () => applyMarkdown("`");
+  const handleBlockquote = () => insertAtLineStart("> ");
+  const handleH1 = () => insertAtLineStart("# ");
+  const handleH2 = () => insertAtLineStart("## ");
+  const handleH3 = () => insertAtLineStart("### ");
+  const handleUnorderedList = () => insertAtLineStart("- ");
+  const handleOrderedList = () => insertAtLineStart("1. ");
+
+  const handleLink = () => {
+    const { start, end, text, before, after } = getSelection();
+    const url = window.prompt("Enter URL:", "https://");
+    if (url == null) return;
+    const label = text.trim() || "link text";
+    const insert = `[${label}](${url})`;
+    setContent(before + insert + after);
+    setTimeout(() => {
+      contentRef.current?.focus();
+      const newPos = start + insert.length;
+      contentRef.current?.setSelectionRange(newPos, newPos);
+    }, 0);
+  };
+
+  const handleImage = () => {
+    const { start, before, after } = getSelection();
+    const url = window.prompt("Enter image URL:", "https://");
+    if (url == null) return;
+    const alt = window.prompt("Alt text (optional):", "") || "image";
+    const insert = `![${alt}](${url})`;
+    setContent(before + insert + after);
+    setTimeout(() => {
+      contentRef.current?.focus();
+      contentRef.current?.setSelectionRange(start + insert.length, start + insert.length);
+    }, 0);
+  };
+
+  const searchSlug = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("slug") : null;
+  useEffect(() => {
+    if (!searchSlug) return;
+    apiRequest("GET", API.articles.get(searchSlug))
+      .then((r) => r.json())
+      .then((a: { title?: string; content?: string; slug?: string; status?: string }) => {
+        if (a.title != null) setTitle(a.title);
+        if (a.content != null) setContent(a.content);
+        if (a.slug != null) setSlug(a.slug);
+        if (a.status === "published") setArticleStatus("published");
+      })
+      .catch(() => {});
+  }, [searchSlug]);
+
+  const wordCount = content.trim() ? content.trim().split(/\s+/).filter(Boolean).length : 0;
+  const readingTimeMin = Math.max(1, Math.ceil(wordCount / 200));
+
+  useEffect(() => {
+    if (!title.trim()) return;
+    autosaveRef.current && clearTimeout(autosaveRef.current);
+    autosaveRef.current = setTimeout(() => {
+      (async () => {
+        setIsSaving(true);
+        try {
+          const payload = { title: title.trim(), content: content || "" };
+          const res = slug
+            ? await apiRequest("PUT", API.articles.update(slug), payload)
+            : await apiRequest("POST", API.articles.create, payload);
+          const data = await res.json();
+          if (data.slug) setSlug(data.slug);
+        } catch (_) {}
+        setIsSaving(false);
+      })();
+    }, 3000);
+    return () => {
+      if (autosaveRef.current) clearTimeout(autosaveRef.current);
+    };
+  }, [title, content, slug]);
 
   const handleSaveDraft = async () => {
     if (!title.trim()) {
@@ -39,14 +165,13 @@ export default function Editor() {
       });
       return;
     }
-
     setIsSaving(true);
     logger.info("Save draft clicked", { titleLength: title.length });
     try {
-      const res = await apiRequest("POST", API.articles.create, {
-        title: title.trim(),
-        content: content || "",
-      });
+      const payload = { title: title.trim(), content: content || "" };
+      const res = slug
+        ? await apiRequest("PUT", API.articles.update(slug), payload)
+        : await apiRequest("POST", API.articles.create, payload);
       const data = await res.json();
       if (data.slug) setSlug(data.slug);
       toast({
@@ -61,6 +186,34 @@ export default function Editor() {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!slug) {
+      toast({
+        title: "Save draft first",
+        description: "Save your draft to get a link, then you can publish.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsPublishing(true);
+    try {
+      await apiRequest("POST", API.articles.publish(slug), {});
+      setArticleStatus("published");
+      toast({
+        title: "Published",
+        description: "Your article is now live.",
+      });
+    } catch (error) {
+      toast({
+        title: "Publish failed",
+        description: "Could not publish. Try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -97,6 +250,85 @@ export default function Editor() {
     }
   };
 
+  const handleGenerateSeo = async () => {
+    if (!title?.trim() && !content?.trim()) {
+      toast({
+        title: "Add title or content",
+        description: "Add a title or some content before generating SEO metadata.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSeoLoading(true);
+    setSeoResult(null);
+    try {
+      const res = await apiRequest("POST", API.ai.seo, {
+        title: title.trim() || "Untitled",
+        content: content?.slice(0, 4000) || "",
+      });
+      const data = await res.json();
+      setSeoResult({
+        seo_topics: data.seo_topics,
+        meta_title: data.meta_title,
+        meta_description: data.meta_description,
+        keywords: data.keywords ?? [],
+      });
+      toast({ title: "SEO suggestions ready", description: "Use the suggestions below for your meta tags." });
+    } catch (error) {
+      toast({
+        title: "SEO generation failed",
+        description: "AI is unavailable or you may need a Pro/Creator plan.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSeoLoading(false);
+    }
+  };
+
+  const handleGenerateDiagram = async () => {
+    if (!diagramTopic.trim()) {
+      toast({ title: "Enter a topic", description: "e.g. API request flow", variant: "destructive" });
+      return;
+    }
+    setIsDiagramLoading(true);
+    try {
+      const res = await apiRequest("POST", API.ai.diagram, {
+        topic: diagramTopic.trim(),
+        diagram_type: "flowchart",
+      });
+      const data = await res.json();
+      const code = data.mermaid_code?.trim();
+      if (code) {
+        const block = `\n\n\`\`\`mermaid\n${code}\n\`\`\`\n\n`;
+        setContent((c) => c + block);
+        setDiagramTopic("");
+        toast({ title: "Diagram inserted", description: "Mermaid diagram added to your content." });
+      } else {
+        toast({ title: "No diagram generated", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Diagram failed", description: "AI unavailable or try another topic.", variant: "destructive" });
+    } finally {
+      setIsDiagramLoading(false);
+    }
+  };
+
+  const handleCrosspost = async () => {
+    if (!slug || (!crosspostDevto && !crosspostMedium)) {
+      toast({ title: "Select at least one platform", variant: "destructive" });
+      return;
+    }
+    setIsCrossposting(true);
+    try {
+      await apiRequest("POST", API.articles.crosspost(slug), { devto: crosspostDevto, medium: crosspostMedium });
+      toast({ title: "Cross-post requested", description: "Your article will be synced to the selected platforms." });
+    } catch (error) {
+      toast({ title: "Cross-post failed", variant: "destructive" });
+    } finally {
+      setIsCrossposting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Editor Header */}
@@ -120,8 +352,13 @@ export default function Editor() {
             <Save className="h-4 w-4 mr-2" />
             {isSaving ? "Saving..." : "Save Draft"}
           </Button>
-          <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white">
-            Publish
+          <Button
+            size="sm"
+            className="bg-green-600 hover:bg-green-700 text-white"
+            onClick={handlePublish}
+            disabled={isPublishing || !slug}
+          >
+            {isPublishing ? "Publishing…" : articleStatus === "published" ? "Published" : "Publish"}
           </Button>
         </div>
       </header>
@@ -137,39 +374,211 @@ export default function Editor() {
           onChange={(e) => setTitle(e.target.value)}
         />
         
-        {/* Toolbar */}
+        {/* Toolbar - all buttons wired to markdown */}
         <div className="flex items-center gap-1 p-2 bg-secondary/30 rounded-lg border border-border sticky top-20 z-10 backdrop-blur-sm">
-          <Button variant="ghost" size="icon" className="h-8 w-8"><Bold className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8"><Italic className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8"><LinkIcon className="h-4 w-4" /></Button>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleBold} title="Bold">
+            <Bold className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleItalic} title="Italic">
+            <Italic className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleUnderline} title="Underline">
+            <Underline className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleLink} title="Link">
+            <LinkIcon className="h-4 w-4" />
+          </Button>
           <div className="w-px h-4 bg-border mx-1" />
-          <Button variant="ghost" size="icon" className="h-8 w-8"><Code className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8"><ImageIcon className="h-4 w-4" /></Button>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleCode} title="Code">
+            <Code className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleImage} title="Image (URL)">
+            <ImageIcon className="h-4 w-4" />
+          </Button>
           <div className="w-px h-4 bg-border mx-1" />
-          <Button variant="ghost" size="icon" className="h-8 w-8"><List className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8"><ListOrdered className="h-4 w-4" /></Button>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleBlockquote} title="Blockquote">
+            <Quote className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleH1} title="Heading 1">
+            <Heading1 className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleH2} title="Heading 2">
+            <Heading2 className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleH3} title="Heading 3">
+            <Heading3 className="h-4 w-4" />
+          </Button>
+          <div className="w-px h-4 bg-border mx-1" />
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleUnorderedList} title="Bullet list">
+            <List className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleOrderedList} title="Numbered list">
+            <ListOrdered className="h-4 w-4" />
+          </Button>
           
           <div className="flex-1" />
           
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             className="text-xs gap-2 border-primary/30 text-primary hover:bg-primary/10"
             onClick={handleAiAssist}
             disabled={isAiGenerating}
           >
-            <Sparkles className={`h-3 w-3 ${isAiGenerating ? 'animate-spin' : ''}`} />
-            {isAiGenerating ? 'Generating...' : 'AI Assist'}
+            <Sparkles className={`h-3 w-3 ${isAiGenerating ? "animate-spin" : ""}`} />
+            {isAiGenerating ? "Generating…" : "AI Assist"}
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs gap-2 border-primary/30 text-primary hover:bg-primary/10"
+            onClick={handleGenerateSeo}
+            disabled={isSeoLoading}
+          >
+            <Search className={`h-3 w-3 ${isSeoLoading ? "animate-spin" : ""}`} />
+            {isSeoLoading ? "Generating…" : "SEO"}
+          </Button>
+          <div className="flex items-center gap-1">
+            <input
+              placeholder="Diagram topic..."
+              value={diagramTopic}
+              onChange={(e) => setDiagramTopic(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleGenerateDiagram()}
+              className="h-8 w-36 rounded border border-border bg-background px-2 text-xs"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10"
+              onClick={handleGenerateDiagram}
+              disabled={isDiagramLoading}
+            >
+              <GitBranch className={`h-3 w-3 ${isDiagramLoading ? "animate-spin" : ""}`} />
+              Diagram
+            </Button>
+          </div>
+        </div>
+
+        {articleStatus === "published" && slug && (
+          <div className="rounded-lg border border-border bg-secondary/20 p-4 flex flex-wrap items-center gap-4">
+            <span className="text-sm font-medium flex items-center gap-2">
+              <Share2 className="h-4 w-4 text-primary" />
+              Cross-post
+            </span>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={crosspostDevto} onChange={(e) => setCrosspostDevto(e.target.checked)} className="rounded" />
+              Dev.to
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={crosspostMedium} onChange={(e) => setCrosspostMedium(e.target.checked)} className="rounded" />
+              Medium
+            </label>
+            <Button variant="outline" size="sm" onClick={handleCrosspost} disabled={isCrossposting}>
+              {isCrossposting ? "Posting…" : "Publish to selected"}
+            </Button>
+          </div>
+        )}
+
+        {seoResult && (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3">
+            <p className="text-sm font-medium text-primary">AI SEO topics</p>
+            {seoResult.seo_topics ? (
+              <p className="text-sm text-foreground whitespace-pre-wrap bg-background/80 rounded px-2 py-2">{seoResult.seo_topics}</p>
+            ) : null}
+            {seoResult.meta_title && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Meta title</p>
+                <p className="text-sm font-mono bg-background/80 rounded px-2 py-1">{seoResult.meta_title}</p>
+              </div>
+            )}
+            {seoResult.meta_description && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Meta description</p>
+                <p className="text-sm font-mono bg-background/80 rounded px-2 py-1">{seoResult.meta_description}</p>
+              </div>
+            )}
+            {seoResult.keywords?.length ? (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Keywords</p>
+                <div className="flex flex-wrap gap-1">
+                  {seoResult.keywords.map((k) => (
+                    <Badge key={k} variant="secondary" className="text-xs">
+                      {k}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <p className="text-xs text-muted-foreground">
+            You can use Markdown to write easily and add code blocks.
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant={viewMode === "edit" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => setViewMode("edit")}
+            >
+              Edit
+            </Button>
+            <Button
+              type="button"
+              variant={viewMode === "preview" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => setViewMode("preview")}
+            >
+              Preview
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              {wordCount} words · {readingTimeMin} min read
+            </span>
+          </div>
         </div>
 
         {/* Content Area */}
-        <Textarea 
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          className="flex-1 min-h-[500px] font-mono text-base resize-none border-none focus-visible:ring-0 p-0 bg-transparent leading-relaxed"
-          placeholder="Start writing..."
-        />
+        {viewMode === "edit" ? (
+          <Textarea
+            ref={contentRef}
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            onKeyDown={(e) => {
+              const mod = e.metaKey || e.ctrlKey;
+              if (!mod) return;
+              switch (e.key.toLowerCase()) {
+                case "b":
+                  e.preventDefault();
+                  handleBold();
+                  break;
+                case "i":
+                  e.preventDefault();
+                  handleItalic();
+                  break;
+                case "u":
+                  e.preventDefault();
+                  handleUnderline();
+                  break;
+                case "k":
+                  e.preventDefault();
+                  handleLink();
+                  break;
+                default:
+                  break;
+              }
+            }}
+            className="flex-1 min-h-[500px] font-mono text-base resize-none border-none focus-visible:ring-0 p-0 bg-transparent leading-relaxed"
+            placeholder="Start writing..."
+          />
+        ) : (
+          <div className="flex-1 min-h-[500px] rounded-lg border border-border bg-card/30 p-6 prose prose-invert max-w-none dark:prose-invert">
+            <MarkdownRenderer content={content || "*Nothing to preview yet.*"} />
+          </div>
+        )}
       </main>
     </div>
   );

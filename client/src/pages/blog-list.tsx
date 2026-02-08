@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, Clock } from "lucide-react";
-import { API_BASE_URL } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { API } from "@/lib/api";
 import { logger } from "@/lib/logger";
 
@@ -36,18 +36,12 @@ export default function BlogList() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const headers: Record<string, string> = {};
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-    const url = `${API_BASE_URL}${API.articles.list}?limit=20&offset=0`;
+    const url = `${API.articles.list}?limit=20&offset=0`;
     logger.info("Fetching article list", { url });
-    fetch(url, { headers, credentials: "include" })
-      .then((res) => {
-        if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
-        return res.json();
-      })
+    apiRequest("GET", url)
+      .then((res) => res.json())
       .then(setData)
-      .catch((e) => setError(e.message))
+      .catch((e) => setError(e?.message ?? "Failed to load articles"))
       .finally(() => setLoading(false));
   }, []);
 

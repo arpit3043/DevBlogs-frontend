@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Navbar } from "@/components/layout";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, DollarSign, MoreHorizontal, Edit2, Eye } from "lucide-react";
+import { FileText, DollarSign, MoreHorizontal, Edit2, Eye, Trash2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -18,7 +19,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { API } from "@/lib/api";
 import { logger } from "@/lib/logger";
@@ -37,15 +49,46 @@ type DashboardData = {
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteSlug, setDeleteSlug] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const { isAuthenticated } = useAuth();
+
+  const refetchDashboard = async () => {
+    try {
+      const response = await apiRequest("GET", API.analytics.creatorDashboard);
+      const dashboardData = (await response.json()) as DashboardData;
+      setData(dashboardData);
+    } catch {
+      setData((prev) => prev ?? { total_articles: 0, total_views: 0, total_earnings: 0, top_articles: [] });
+    }
+  };
+
+  const handleDeleteArticle = async () => {
+    if (!deleteSlug) return;
+    setIsDeleting(true);
+    try {
+      await apiRequest("DELETE", API.articles.delete(deleteSlug));
+      toast({ title: "Article deleted", description: "The article has been removed." });
+      setDeleteSlug(null);
+      await refetchDashboard();
+    } catch (e: any) {
+      toast({
+        title: "Delete failed",
+        description: e?.message || "Could not delete the article.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-
-    if (!token) {
-      logger.warn("No token found, redirecting to login");
+    if (!isAuthenticated) {
+      logger.warn("User not authenticated, redirecting to login");
       setLocation("/login");
       return;
     }
@@ -59,7 +102,9 @@ export default function Dashboard() {
           API.analytics.creatorDashboard
         );
 
-        const dashboardData = await response.json() as DashboardData;
+        const dashboardData =
+          (await response.json()) as DashboardData;
+
         setData(dashboardData);
       } catch (e: any) {
         logger.error("Dashboard load failed", e);
@@ -78,9 +123,7 @@ export default function Dashboard() {
         setLoading(false);
       }
     })();
-  }, [setLocation]);
-
-  /* ---------------- Loading ---------------- */
+  }, [isAuthenticated, setLocation]);
 
   if (loading) {
     return (
@@ -97,8 +140,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
-  /* ---------------- Error ---------------- */
 
   if (error) {
     return (
@@ -122,8 +163,6 @@ export default function Dashboard() {
     total_earnings: 0,
     top_articles: [],
   };
-
-  /* ---------------- UI ---------------- */
 
   return (
     <div className="min-h-screen bg-background">
@@ -251,11 +290,19 @@ export default function Dashboard() {
                               </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild>
-                              <Link
-                                href={`/editor?slug=${a.slug}`}
-                              >
+                              <Link href={`/editor?slug=${a.slug}`}>
                                 Edit
                               </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onSelect={(e) => {
+                                e.preventDefault();
+                                setDeleteSlug(a.slug);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -268,6 +315,30 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog open={!!deleteSlug} onOpenChange={(open) => !open && setDeleteSlug(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete article?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove this article. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteArticle();
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

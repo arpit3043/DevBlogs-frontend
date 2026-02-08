@@ -79,13 +79,36 @@
   --ring: 252 59% 50%;
 
   --radius: 0.5rem;
-  
+
   /* Chart Colors */
   --chart-1: 252 59% 50%;
   --chart-2: 190 90% 50%;
   --chart-3: 340 75% 55%;
   --chart-4: 280 65% 60%;
   --chart-5: 160 60% 45%;
+}
+
+/* Light mode */
+.light {
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 252 59% 50%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 252 59% 50%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 252 59% 50%;
 }
 
 @layer base {

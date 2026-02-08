@@ -11,20 +11,22 @@ export const API = {
     updateMe: `${API_PREFIX}/auth/me`,
   },
   articles: {
-    list: `${API_PREFIX}/articles`,
-    create: `${API_PREFIX}/articles`,
+    list: `${API_PREFIX}/articles/`,
+    create: `${API_PREFIX}/articles/`,
     get: (slug: string) => `${API_PREFIX}/articles/${slug}`,
     update: (slug: string) => `${API_PREFIX}/articles/${slug}`,
     delete: (slug: string) => `${API_PREFIX}/articles/${slug}`,
     publish: (slug: string) => `${API_PREFIX}/articles/${slug}/publish`,
     unpublish: (slug: string) => `${API_PREFIX}/articles/${slug}/unpublish`,
     related: (slug: string) => `${API_PREFIX}/articles/${slug}/related`,
+    crosspost: (slug: string) => `${API_PREFIX}/articles/${slug}/crosspost`,
   },
   ai: {
     tldr: `${API_PREFIX}/ai/tldr`,
     explain: `${API_PREFIX}/ai/explain`,
     improve: `${API_PREFIX}/ai/improve`,
     seo: `${API_PREFIX}/ai/seo`,
+    diagram: `${API_PREFIX}/ai/diagram`,
     usage: `${API_PREFIX}/ai/usage`,
   },
   billing: {
@@ -37,6 +39,7 @@ export const API = {
   },
   analytics: {
     articleStats: (id: number) => `${API_PREFIX}/analytics/article/${id}`,
+    codeCopy: `${API_PREFIX}/analytics/code-copy`,
     creatorDashboard: `${API_PREFIX}/analytics/creator/dashboard`,
     platform: `${API_PREFIX}/analytics/platform`,
     readingProgress: `${API_PREFIX}/analytics/reading-progress`,

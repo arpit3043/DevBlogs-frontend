@@ -10,6 +10,25 @@ import { apiRequest, getTokenFromAuthResponse } from "@/lib/queryClient";
 import { API } from "@/lib/api";
 import { logger } from "@/lib/logger";
 
+function persistSession(token: string) {
+  localStorage.setItem("token", token);
+  apiRequest("GET", API.auth.me)
+    .then((r) => r.json())
+    .then((data) => {
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          id: data.id,
+          username: data.username,
+          full_name: data.full_name ?? null,
+          email: data.email ?? null,
+          role: data.role ?? "reader",
+        })
+      );
+    })
+    .catch(() => {});
+}
+
 export default function Register() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -43,7 +62,7 @@ export default function Register() {
       const data = await res.json();
       const token = getTokenFromAuthResponse(data);
       if (token) {
-        localStorage.setItem("token", token);
+        persistSession(token);
         setLocation("/dashboard");
         toast({
           title: "Registration successful",

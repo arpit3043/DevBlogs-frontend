@@ -1,25 +1,43 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { 
-  Code2, 
-  PenLine, 
-  LayoutDashboard, 
-  UserCircle,
+import { Badge } from "@/components/ui/badge";
+import {
+  Code2,
+  PenLine,
+  LayoutDashboard,
   Menu,
-  X
+  LogOut,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useAuth } from "@/hooks/useAuth";
+import { useTheme } from "@/contexts/ThemeContext";
+import { FeedbackDialog } from "@/components/FeedbackDialog";
+
+function logOut() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  window.location.href = "/";
+}
 
 export function Navbar() {
   const [location] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const { isAuthenticated, user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   const navItems = [
-    { label: "Features", href: "/#features" },
-    { label: "Pricing", href: "/#pricing" },
-    { label: "Blog", href: "/blog" },
+    { label: "Home", href: "/" },
+    { label: "Explore", href: "/blog" },
+    { label: "Write", href: "/editor" },
+    { label: "Bookmarks", href: "/bookmarks" },
+    { label: "Profile", href: "/dashboard" },
   ];
+  if (isAuthenticated && user?.role === "admin") {
+    navItems.push({ label: "Admin", href: "/admin" });
+  }
 
   return (
     <nav className="border-b border-border/40 bg-background/80 backdrop-blur-md sticky top-0 z-50">
@@ -33,35 +51,68 @@ export function Navbar() {
           </div>
         </Link>
 
-        {/* Desktop Nav */}
-        <div className="hidden md:flex items-center gap-8">
+        <div className="hidden md:flex items-center gap-6">
           {navItems.map((item) => (
-            <a 
-              key={item.href} 
+            <Link
+              key={item.href}
               href={item.href}
               className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
             >
               {item.label}
-            </a>
+            </Link>
           ))}
         </div>
 
-        <div className="hidden md:flex items-center gap-4">
-          <Link href="/login">
-            <Button variant="ghost" size="sm">Log in</Button>
-          </Link>
-          <Link href="/dashboard">
-            <Button variant="default" size="sm" className="gap-2">
-              <LayoutDashboard className="h-4 w-4" />
-              Dashboard
-            </Button>
-          </Link>
-          <Link href="/editor">
-            <Button variant="outline" size="sm" className="gap-2 border-primary/20 hover:border-primary/50 hover:bg-primary/5">
-              <PenLine className="h-4 w-4" />
-              Write
-            </Button>
-          </Link>
+        <div className="hidden md:flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleTheme} title={theme === "dark" ? "Light mode" : "Dark mode"}>
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
+          {isAuthenticated ? (
+            <>
+              <span className="text-sm text-muted-foreground">
+                {user?.full_name || user?.username || "User"}
+                {user?.role && (
+                  <Badge variant="secondary" className="ml-2 text-xs capitalize">
+                    {user.role}
+                  </Badge>
+                )}
+              </span>
+              <Link href="/dashboard">
+                <Button variant="default" size="sm" className="gap-2">
+                  <LayoutDashboard className="h-4 w-4" />
+                  Dashboard
+                </Button>
+              </Link>
+              <Link href="/editor">
+                <Button variant="outline" size="sm" className="gap-2 border-primary/20 hover:border-primary/50 hover:bg-primary/5">
+                  <PenLine className="h-4 w-4" />
+                  Write
+                </Button>
+              </Link>
+              <Button variant="ghost" size="sm" className="gap-2" onClick={logOut}>
+                <LogOut className="h-4 w-4" />
+                Log out
+              </Button>
+            </>
+          ) : (
+            <>
+              <Link href="/login">
+                <Button variant="ghost" size="sm">Log in</Button>
+              </Link>
+              <Link href="/dashboard">
+                <Button variant="default" size="sm" className="gap-2">
+                  <LayoutDashboard className="h-4 w-4" />
+                  Dashboard
+                </Button>
+              </Link>
+              <Link href="/editor">
+                <Button variant="outline" size="sm" className="gap-2 border-primary/20 hover:border-primary/50 hover:bg-primary/5">
+                  <PenLine className="h-4 w-4" />
+                  Write
+                </Button>
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Mobile Nav */}
@@ -75,16 +126,20 @@ export function Navbar() {
             <SheetContent>
               <div className="flex flex-col gap-6 mt-10">
                 {navItems.map((item) => (
-                  <a 
-                    key={item.href} 
-                    href={item.href}
-                    className="text-lg font-medium"
-                    onClick={() => setIsOpen(false)}
-                  >
+                  <Link key={item.href} href={item.href} className="text-lg font-medium" onClick={() => setIsOpen(false)}>
                     {item.label}
-                  </a>
+                  </Link>
                 ))}
+                <Button variant="ghost" className="w-full justify-start gap-2" onClick={() => { toggleTheme(); setIsOpen(false); }}>
+                  {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  {theme === "dark" ? "Light mode" : "Dark mode"}
+                </Button>
                 <div className="h-px bg-border my-2" />
+                {isAuthenticated && (
+                  <p className="text-sm text-muted-foreground">
+                    {user?.full_name || user?.username || "User"} ({user?.role ?? "reader"})
+                  </p>
+                )}
                 <Link href="/dashboard">
                   <Button className="w-full justify-start gap-2" variant="secondary" onClick={() => setIsOpen(false)}>
                     <LayoutDashboard className="h-4 w-4" /> Dashboard
@@ -95,6 +150,17 @@ export function Navbar() {
                     <PenLine className="h-4 w-4" /> Start Writing
                   </Button>
                 </Link>
+                {isAuthenticated ? (
+                  <Button variant="ghost" className="w-full justify-start gap-2" onClick={() => { logOut(); setIsOpen(false); }}>
+                    <LogOut className="h-4 w-4" /> Log out
+                  </Button>
+                ) : (
+                  <Link href="/login">
+                    <Button className="w-full justify-start gap-2" onClick={() => setIsOpen(false)}>
+                      Log in
+                    </Button>
+                  </Link>
+                )}
               </div>
             </SheetContent>
           </Sheet>
@@ -124,10 +190,12 @@ export function Footer() {
           <div>
             <h4 className="font-medium mb-4 text-sm uppercase tracking-wider text-muted-foreground">Product</h4>
             <ul className="space-y-2 text-sm">
-              <li><a href="#" className="hover:text-primary transition-colors">Features</a></li>
-              <li><a href="#" className="hover:text-primary transition-colors">Integrations</a></li>
-              <li><a href="#" className="hover:text-primary transition-colors">Pricing</a></li>
-              <li><a href="#" className="hover:text-primary transition-colors">Changelog</a></li>
+              <li><a href="/getting-started" className="hover:text-primary transition-colors">Getting started</a></li>
+              <li><a href="/#features" className="hover:text-primary transition-colors">Features</a></li>
+              <li><a href="/#pricing" className="hover:text-primary transition-colors">Pricing</a></li>
+              <li><a href="/blog" className="hover:text-primary transition-colors">Blog</a></li>
+              <li><a href="/bookmarks" className="hover:text-primary transition-colors">Bookmarks</a></li>
+              <li><span className="inline-flex"><FeedbackDialog /></span></li>
             </ul>
           </div>
 

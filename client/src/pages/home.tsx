@@ -1,18 +1,221 @@
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Navbar, Footer } from "@/components/layout";
 import heroImage from "@/assets/hero-tech.png";
-import { Check, Sparkles, Terminal, Cpu, Share2, LineChart } from "lucide-react";
-import { Link } from "wouter";
+import { Check, Sparkles, Terminal, Cpu, Share2, LineChart, Search, Bookmark, ChevronDown } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { API } from "@/lib/api";
+
+type ArticleItem = {
+  id: number;
+  slug: string;
+  title: string;
+  subtitle?: string;
+  tags: string[];
+  reading_time_minutes?: number;
+  view_count: number;
+  published_at: string | null;
+  cover_image_url?: string | null;
+};
 
 export default function Home() {
+  const { isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  const [subscribing, setSubscribing] = useState<string | null>(null);
+  const [feedArticles, setFeedArticles] = useState<ArticleItem[]>([]);
+  const [upNext, setUpNext] = useState<ArticleItem[]>([]);
+  const [feedLoading, setFeedLoading] = useState(true);
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    apiRequest("GET", `${API.articles.list}?limit=10&offset=0`)
+      .then((r) => r.json())
+      .then((d: { items: ArticleItem[] }) => {
+        setFeedArticles(d.items || []);
+        setUpNext((d.items || []).slice(0, 3));
+      })
+      .catch(() => {})
+      .finally(() => setFeedLoading(false));
+  }, []);
+
+  const handleSubscribe = async (plan: string) => {
+    if (!isAuthenticated) return;
+    setSubscribing(plan);
+    try {
+      await apiRequest("POST", API.billing.subscribe, { plan });
+      toast({ title: "Subscribed", description: `You're now on the ${plan} plan.` });
+    } catch (error) {
+      toast({ title: "Subscription failed", variant: "destructive" });
+    } finally {
+      setSubscribing(null);
+    }
+  };
+
+  const formatTime = (dateStr: string | null) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - d.getTime()) / (24 * 60 * 60 * 1000));
+    if (diff === 0) return "Today";
+    if (diff === 1) return "1d";
+    if (diff < 7) return `${diff}d`;
+    if (diff < 30) return `${Math.floor(diff / 7)}w`;
+    return `${Math.floor(diff / 30)}mo`;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
-      {/* Hero Section */}
-      <section className="relative pt-20 pb-32 overflow-hidden">
+
+      {/* Top banner - Substack style */}
+      <section className="bg-primary text-primary-foreground py-6 px-4">
+        <div className="container mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <p className="text-lg font-medium">The app for independent voices.</p>
+          <div className="flex gap-2">
+            <Link href="/register">
+              <Button size="sm" variant="secondary" className="bg-white text-primary hover:bg-white/90">
+                Get started
+              </Button>
+            </Link>
+            <Link href="/blog">
+              <Button size="sm" variant="outline" className="border-white/50 text-white hover:bg-white/10">
+                Learn more
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Two-column: Feed + Sidebar */}
+      <main className="container mx-auto px-4 py-6 flex flex-col lg:flex-row gap-8 max-w-6xl">
+        {/* Left: Feed */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1 mb-4">
+            <span className="font-medium">For you</span>
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          </div>
+          {feedLoading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="p-4">
+                  <div className="h-4 w-48 bg-muted rounded animate-pulse" />
+                  <div className="h-3 w-32 mt-2 bg-muted rounded animate-pulse" />
+                </Card>
+              ))}
+            </div>
+          ) : feedArticles.length > 0 ? (
+            <div className="space-y-6">
+              {feedArticles.map((a) => (
+                <Link key={a.id} href={`/blog/${a.slug}`}>
+                  <Card className="p-4 hover:border-primary/40 transition-colors cursor-pointer">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <h2 className="font-semibold text-lg line-clamp-2">{a.title}</h2>
+                        {a.subtitle && (
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{a.subtitle}</p>
+                        )}
+                        <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                          <span>{formatTime(a.published_at)}</span>
+                          {a.reading_time_minutes != null && (
+                            <>
+                              <span>·</span>
+                              <span>{a.reading_time_minutes} min read</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      {a.cover_image_url && (
+                        <img
+                          src={a.cover_image_url}
+                          alt=""
+                          className="w-24 h-24 object-cover rounded-lg shrink-0"
+                        />
+                      )}
+                    </div>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground">No posts yet. Be the first to write.</p>
+          )}
+        </div>
+
+        {/* Right: Sidebar */}
+        <aside className="w-full lg:w-80 shrink-0 space-y-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="search"
+              placeholder="Search DevLog"
+              className="w-full h-10 pl-9 pr-4 rounded-lg border border-input bg-background text-sm"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const q = (e.target as HTMLInputElement).value.trim();
+                  setLocation(q ? `/blog?q=${encodeURIComponent(q)}` : "/blog");
+                }
+              }}
+            />
+          </div>
+          {!isAuthenticated && (
+            <Card className="p-4 border-primary/20 bg-primary/5">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-8 w-8 rounded bg-primary/20 flex items-center justify-center">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                </div>
+                <span className="font-medium">Log in or sign up</span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">
+                Join the most interesting and insightful discussions.
+              </p>
+              <div className="flex gap-2">
+                <Link href="/register">
+                  <Button size="sm" className="flex-1">Get started</Button>
+                </Link>
+                <Link href="/login">
+                  <Button size="sm" variant="outline">Sign in</Button>
+                </Link>
+              </div>
+            </Card>
+          )}
+          <div>
+            <h3 className="font-semibold mb-3">Up next</h3>
+            {upNext.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No recommendations yet.</p>
+            ) : (
+              <ul className="space-y-3">
+                {upNext.map((a) => (
+                  <li key={a.id}>
+                    <Link href={`/blog/${a.slug}`} className="flex gap-3 group">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium line-clamp-2 group-hover:text-primary">{a.title}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {a.reading_time_minutes != null ? `${a.reading_time_minutes} min read` : ""}
+                        </p>
+                      </div>
+                      {a.cover_image_url ? (
+                        <img src={a.cover_image_url} alt="" className="w-14 h-14 object-cover rounded shrink-0" />
+                      ) : (
+                        <div className="w-14 h-14 rounded bg-muted shrink-0 flex items-center justify-center">
+                          <Bookmark className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                      )}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </aside>
+      </main>
+
+      {/* Hero Section - compact */}
+      <section className="relative pt-12 pb-20 overflow-hidden border-t border-border/50">
         <div className="absolute inset-0 tech-grid-bg opacity-30 pointer-events-none" />
         <div className="absolute top-0 right-0 w-1/2 h-full bg-primary/5 blur-[120px] rounded-full pointer-events-none" />
         
@@ -156,7 +359,9 @@ export default function Home() {
                 </ul>
               </CardContent>
               <CardFooter>
-                <Button variant="outline" className="w-full">Get Started</Button>
+                <Link href="/register">
+                  <Button variant="outline" className="w-full">Get Started</Button>
+                </Link>
               </CardFooter>
             </Card>
 
@@ -179,7 +384,15 @@ export default function Home() {
                 </ul>
               </CardContent>
               <CardFooter>
-                <Button className="w-full">Start Pro Trial</Button>
+                {isAuthenticated ? (
+                  <Button className="w-full" disabled={subscribing !== null} onClick={() => handleSubscribe("pro")}>
+                    {subscribing === "pro" ? "Subscribing…" : "Start Pro Trial"}
+                  </Button>
+                ) : (
+                  <Link href="/login">
+                    <Button className="w-full">Start Pro Trial</Button>
+                  </Link>
+                )}
               </CardFooter>
             </Card>
 
@@ -199,7 +412,15 @@ export default function Home() {
                 </ul>
               </CardContent>
               <CardFooter>
-                <Button variant="outline" className="w-full">Contact Sales</Button>
+                {isAuthenticated ? (
+                  <Button variant="outline" className="w-full" disabled={subscribing !== null} onClick={() => handleSubscribe("creator")}>
+                    {subscribing === "creator" ? "Subscribing…" : "Upgrade to Team"}
+                  </Button>
+                ) : (
+                  <Link href="/register">
+                    <Button variant="outline" className="w-full">Contact Sales</Button>
+                  </Link>
+                )}
               </CardFooter>
             </Card>
           </div>

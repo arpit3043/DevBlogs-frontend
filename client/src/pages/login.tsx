@@ -16,6 +16,23 @@ import { apiRequest, getTokenFromAuthResponse } from "@/lib/queryClient";
 import { API } from "@/lib/api";
 import { logger } from "@/lib/logger";
 
+function persistSession(token: string) {
+  localStorage.setItem("token", token);
+  apiRequest("GET", API.auth.me)
+    .then((r) => r.json())
+    .then((data) => {
+      const user = {
+        id: data.id,
+        username: data.username,
+        full_name: data.full_name ?? null,
+        email: data.email ?? null,
+        role: data.role ?? "reader",
+      };
+      localStorage.setItem("user", JSON.stringify(user));
+    })
+    .catch(() => {});
+}
+
 declare global {
   interface Window {
     google: any;
@@ -25,8 +42,12 @@ declare global {
 export default function Login() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-
   const [isLoading, setIsLoading] = useState(false);
+  const token = localStorage.getItem("token");
+
+  useEffect(() => {
+    if (token) setLocation("/dashboard");
+  }, [token, setLocation]);
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -62,9 +83,7 @@ export default function Login() {
       const token = getTokenFromAuthResponse(data);
 
       if (!token) throw new Error("Token missing");
-
-      localStorage.setItem("token", token);
-
+      persistSession(token);
       toast({
         title: "Login successful",
         description: "Welcome back!",
@@ -104,14 +123,11 @@ export default function Login() {
       const token = getTokenFromAuthResponse(data);
 
       if (!token) throw new Error("Token not received");
-
-      localStorage.setItem("token", token);
-
+      persistSession(token);
       toast({
         title: "Login successful",
         description: "Welcome back!",
       });
-
       setLocation("/dashboard");
     } catch (error) {
       logger.error("Login failed", error);
