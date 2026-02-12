@@ -76,11 +76,15 @@ export default function Register() {
         });
       } 
     } catch (error: any) {
-        let message = "Please try again";
+        let message = "Registration failed. Please try again.";
       
         try {
-          const err = await error.response?.json?.();
-          message = err?.error || message;
+          if (error?.response) {
+            const err = await error.response.json();
+            message = err?.detail || err?.error || message;
+          } else if (error?.message) {
+            message = error.message;
+          }
         } catch {}
       
         toast({

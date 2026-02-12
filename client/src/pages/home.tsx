@@ -152,7 +152,7 @@ export default function Home() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="search"
-              placeholder="Search DevLog"
+              placeholder="Search Tech B-Logs"
               className="w-full h-10 pl-9 pr-4 rounded-lg border border-input bg-background text-sm"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
@@ -222,9 +222,6 @@ export default function Home() {
         <div className="container mx-auto px-4 relative z-10">
           <div className="flex flex-col md:flex-row items-center gap-12">
             <div className="flex-1 space-y-8">
-              <Badge variant="outline" className="px-4 py-1 border-primary/40 text-primary bg-primary/10 rounded-full animate-in fade-in slide-in-from-bottom-4 duration-700">
-                v2.0 Public Beta is Live
-              </Badge>
               <h1 className="text-5xl md:text-7xl font-display font-bold leading-[1.1] tracking-tight animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
                 Where <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-indigo-400">Engineers</span> <br/>
                 Share Knowledge.

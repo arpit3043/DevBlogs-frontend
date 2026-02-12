@@ -37,6 +37,15 @@ export default function Editor() {
   const [isSaving, setIsSaving] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState(`# Introduction\n\nWrite your technical deep dive here...`);
+  
+  // Initialize history on mount
+  useEffect(() => {
+    const initialContent = `# Introduction\n\nWrite your technical deep dive here...`;
+    if (historyRef.current.length === 0) {
+      historyRef.current = [initialContent];
+      historyIndexRef.current = 0;
+    }
+  }, []);
   const [slug, setSlug] = useState("");
   const [articleStatus, setArticleStatus] = useState<"draft" | "published">("draft");
   const [isPublishing, setIsPublishing] = useState(false);
@@ -50,6 +59,8 @@ export default function Editor() {
   const [viewMode, setViewMode] = useState<"edit" | "preview">("edit");
   const contentRef = useRef<HTMLTextAreaElement>(null);
   const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const historyRef = useRef<string[]>([]);
+  const historyIndexRef = useRef<number>(-1);
 
   const getSelection = useCallback((): { start: number; end: number; text: string; before: string; after: string } => {
     const ta = contentRef.current;
@@ -60,24 +71,35 @@ export default function Editor() {
     return { start, end, text, before: content.slice(0, start), after: content.slice(end) };
   }, [content]);
 
+  const saveToHistory = useCallback((text: string) => {
+    if (historyRef.current[historyIndexRef.current] === text) return;
+    historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1);
+    historyRef.current.push(text);
+    if (historyRef.current.length > 50) historyRef.current.shift();
+    historyIndexRef.current = historyRef.current.length - 1;
+  }, []);
+
   const applyMarkdown = useCallback((wrapBefore: string, wrapAfter: string = wrapBefore) => {
     const { start, end, text, before, after } = getSelection();
     const newContent = before + wrapBefore + text + wrapAfter + after;
     setContent(newContent);
+    saveToHistory(newContent);
     setTimeout(() => {
       contentRef.current?.focus();
       const newPos = start + wrapBefore.length + text.length;
       contentRef.current?.setSelectionRange(newPos, newPos);
     }, 0);
-  }, [getSelection]);
+  }, [getSelection, saveToHistory]);
 
   const insertAtLineStart = useCallback((prefix: string) => {
     const { start, before, after } = getSelection();
     const lineStart = before.lastIndexOf("\n") + 1;
     const newBefore = before.slice(0, lineStart) + prefix + before.slice(lineStart);
-    setContent(newBefore + after);
+    const newContent = newBefore + after;
+    setContent(newContent);
+    saveToHistory(newContent);
     setTimeout(() => contentRef.current?.focus(), 0);
-  }, [getSelection]);
+  }, [getSelection, saveToHistory]);
 
   const handleBold = () => applyMarkdown("**");
   const handleItalic = () => applyMarkdown("*");
@@ -96,7 +118,9 @@ export default function Editor() {
     if (url == null) return;
     const label = text.trim() || "link text";
     const insert = `[${label}](${url})`;
-    setContent(before + insert + after);
+    const newContent = before + insert + after;
+    setContent(newContent);
+    saveToHistory(newContent);
     setTimeout(() => {
       contentRef.current?.focus();
       const newPos = start + insert.length;
@@ -104,13 +128,43 @@ export default function Editor() {
     }, 0);
   };
 
+  const handleUndo = useCallback(() => {
+    if (historyIndexRef.current > 0) {
+      historyIndexRef.current--;
+      const prevContent = historyRef.current[historyIndexRef.current];
+      setContent(prevContent);
+    }
+  }, []);
+
+  const handleRedo = useCallback(() => {
+    if (historyIndexRef.current < historyRef.current.length - 1) {
+      historyIndexRef.current++;
+      const nextContent = historyRef.current[historyIndexRef.current];
+      setContent(nextContent);
+    }
+  }, []);
+
+  // Track content changes for history (debounced to avoid too many entries)
+  useEffect(() => {
+    if (historyRef.current.length === 0) return; // Skip if not initialized
+    const timeoutId = setTimeout(() => {
+      const current = historyRef.current[historyIndexRef.current];
+      if (current !== content) {
+        saveToHistory(content);
+      }
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [content, saveToHistory]);
+
   const handleImage = () => {
     const { start, before, after } = getSelection();
     const url = window.prompt("Enter image URL:", "https://");
     if (url == null) return;
     const alt = window.prompt("Alt text (optional):", "") || "image";
     const insert = `![${alt}](${url})`;
-    setContent(before + insert + after);
+    const newContent = before + insert + after;
+    setContent(newContent);
+    saveToHistory(newContent);
     setTimeout(() => {
       contentRef.current?.focus();
       contentRef.current?.setSelectionRange(start + insert.length, start + insert.length);
@@ -119,12 +173,23 @@ export default function Editor() {
 
   const searchSlug = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("slug") : null;
   useEffect(() => {
-    if (!searchSlug) return;
+    if (!searchSlug) {
+      // Initialize history with initial content
+      if (content && historyRef.current.length === 0) {
+        historyRef.current = [content];
+        historyIndexRef.current = 0;
+      }
+      return;
+    }
     apiRequest("GET", API.articles.get(searchSlug))
       .then((r) => r.json())
       .then((a: { title?: string; content?: string; slug?: string; status?: string }) => {
         if (a.title != null) setTitle(a.title);
-        if (a.content != null) setContent(a.content);
+        if (a.content != null) {
+          setContent(a.content);
+          historyRef.current = [a.content];
+          historyIndexRef.current = 0;
+        }
         if (a.slug != null) setSlug(a.slug);
         if (a.status === "published") setArticleStatus("published");
       })
@@ -143,7 +208,7 @@ export default function Editor() {
         try {
           const payload = { title: title.trim(), content: content || "" };
           const res = slug
-            ? await apiRequest("PUT", API.articles.update(slug), payload)
+            ? await apiRequest("PATCH", API.articles.patch(slug), payload)
             : await apiRequest("POST", API.articles.create, payload);
           const data = await res.json();
           if (data.slug) setSlug(data.slug);
@@ -170,7 +235,7 @@ export default function Editor() {
     try {
       const payload = { title: title.trim(), content: content || "" };
       const res = slug
-        ? await apiRequest("PUT", API.articles.update(slug), payload)
+        ? await apiRequest("PATCH", API.articles.patch(slug), payload)
         : await apiRequest("POST", API.articles.create, payload);
       const data = await res.json();
       if (data.slug) setSlug(data.slug);
@@ -198,18 +263,41 @@ export default function Editor() {
       });
       return;
     }
+    if (articleStatus === "published") {
+      toast({
+        title: "Already published",
+        description: "This article is already published. Use the update endpoint to modify it.",
+        variant: "default",
+      });
+      return;
+    }
     setIsPublishing(true);
     try {
-      await apiRequest("POST", API.articles.publish(slug), {});
+      const res = await apiRequest("POST", API.articles.publish(slug), {});
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const detail = errData.detail || res.statusText;
+        if (res.status === 400) {
+          toast({
+            title: "Cannot publish",
+            description: detail || "Article is already published or invalid state.",
+            variant: "destructive",
+          });
+          return;
+        }
+        throw new Error(detail);
+      }
       setArticleStatus("published");
+      setViewMode("preview");
       toast({
         title: "Published",
         description: "Your article is now live.",
       });
-    } catch (error) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "Could not publish";
       toast({
         title: "Publish failed",
-        description: "Could not publish. Try again.",
+        description: msg.includes("already published") ? "Article is already published. Use update to modify it." : msg,
         variant: "destructive",
       });
     } finally {
@@ -566,6 +654,20 @@ export default function Editor() {
                 case "k":
                   e.preventDefault();
                   handleLink();
+                  break;
+                case "z":
+                  e.preventDefault();
+                  if (e.shiftKey) {
+                    handleRedo();
+                  } else {
+                    handleUndo();
+                  }
+                  break;
+                case "y":
+                  if (e.metaKey || e.ctrlKey) {
+                    e.preventDefault();
+                    handleRedo();
+                  }
                   break;
                 default:
                   break;

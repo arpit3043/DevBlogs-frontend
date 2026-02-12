@@ -2,7 +2,6 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Code2,
   PenLine,
   LayoutDashboard,
   Menu,
@@ -15,6 +14,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/contexts/ThemeContext";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
+import techBlogsLogo from "@/assets/tech-b-logs-logo.png";
 
 function logOut() {
   localStorage.removeItem("token");
@@ -43,11 +43,13 @@ export function Navbar() {
     <nav className="border-b border-border/40 bg-background/80 backdrop-blur-md sticky top-0 z-50">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <Link href="/">
-          <div className="flex items-center gap-2 cursor-pointer">
-            <div className="h-8 w-8 bg-primary/20 rounded-lg flex items-center justify-center border border-primary/30">
-              <Code2 className="h-5 w-5 text-primary" />
-            </div>
-            <span className="font-display font-bold text-xl tracking-tight">DevLog</span>
+          <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+            <img 
+              src={techBlogsLogo} 
+              alt="Tech B-Logs" 
+              className="h-10 w-auto object-contain"
+            />
+            <span className="font-display font-bold text-xl tracking-tight hidden sm:inline">Tech B-Logs</span>
           </div>
         </Link>
 
@@ -177,10 +179,12 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center gap-2 mb-4">
-              <div className="h-6 w-6 bg-primary/20 rounded flex items-center justify-center border border-primary/30">
-                <Code2 className="h-4 w-4 text-primary" />
-              </div>
-              <span className="font-display font-bold text-lg">DevLog</span>
+              <img 
+                src={techBlogsLogo} 
+                alt="Tech B-Logs" 
+                className="h-8 w-auto object-contain"
+              />
+              <span className="font-display font-bold text-lg">Tech B-Logs</span>
             </div>
             <p className="text-muted-foreground text-sm max-w-sm">
               The platform for engineering teams to share knowledge, document systems, and build their technical brand.
@@ -208,7 +212,7 @@ export function Footer() {
           </div>
         </div>
         <div className="mt-12 pt-8 border-t border-border/30 text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} DevLog Inc. All rights reserved.
+          © {new Date().getFullYear()} Tech B-Logs. All rights reserved.
         </div>
       </div>
     </footer>

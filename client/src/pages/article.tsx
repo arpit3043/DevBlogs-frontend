@@ -188,13 +188,43 @@ export default function ArticlePage() {
     setLoadingTldr(true);
     try {
       const res = await apiRequest("POST", API.ai.tldr, { article_slug: slug });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const detail = errData.detail || res.statusText;
+        if (res.status === 403) {
+          toast({
+            title: "Authentication required",
+            description: "Please sign in with a Creator account to use AI TL;DR.",
+            variant: "destructive",
+          });
+          return;
+        }
+        if (res.status === 503) {
+          toast({
+            title: "AI service unavailable",
+            description: detail || "AI rate limit exceeded. Please try again in a few minutes.",
+            variant: "destructive",
+          });
+          return;
+        }
+        throw new Error(detail);
+      }
       const data = await res.json();
-      setTldr(parseTldr(data.tldr || ""));
+      const tldrText = parseTldr(data.tldr || "");
+      if (!tldrText) {
+        toast({
+          title: "TL;DR unavailable",
+          description: "AI service returned empty response. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setTldr(tldrText);
     } catch (err: unknown) {
-      const msg = err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "";
+      const msg = err instanceof Error ? err.message : "Failed to generate TL;DR";
       toast({
         title: "TL;DR unavailable",
-        description: msg?.includes("503") ? "AI rate limit. Try again in a few minutes." : "Sign in with a Pro/Creator account to use AI TL;DR.",
+        description: msg.includes("rate limit") || msg.includes("503") ? "AI rate limit exceeded. Please try again in a few minutes." : msg,
         variant: "destructive",
       });
     } finally {
@@ -211,8 +241,24 @@ export default function ArticlePage() {
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         const detail = err.detail || res.statusText;
+        if (res.status === 400) {
+          toast({ title: "Invalid request", description: detail || "Please provide a valid concept to explain.", variant: "destructive" });
+          setLoadingExplain(false);
+          return;
+        }
+        if (res.status === 403) {
+          toast({ title: "Authentication required", description: "Please sign in with a Creator account to use AI Explain.", variant: "destructive" });
+          setLoadingExplain(false);
+          return;
+        }
         if (res.status === 503) {
-          toast({ title: "Explain unavailable", description: detail || "AI rate limit. Try again in a few minutes.", variant: "destructive" });
+          toast({ title: "AI service unavailable", description: detail || "AI rate limit exceeded. Please try again in a few minutes.", variant: "destructive" });
+          setLoadingExplain(false);
+          return;
+        }
+        if (res.status === 500) {
+          toast({ title: "Explanation failed", description: detail || "Failed to generate explanation. Please try again.", variant: "destructive" });
+          setLoadingExplain(false);
           return;
         }
         throw new Error(detail);
@@ -220,13 +266,18 @@ export default function ArticlePage() {
       const data = await res.json();
       const raw = data.explanation || "";
       const text = raw.trim().startsWith("{") ? (() => { try { const o = JSON.parse(raw); return o.explanation || raw; } catch { return raw; } })() : raw;
-      setExplanation(text);
+      if (!text || text.includes("Unable to generate explanation")) {
+        setExplanation(text || `Unable to explain '${concept}' from this article. The concept may not be clearly explained here. Consider searching online resources or asking a more specific question.`);
+      } else {
+        setExplanation(text);
+      }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "";
+      const msg = err instanceof Error ? err.message : "Failed to explain concept";
+      setExplanation(`Unable to explain '${concept}' from this article. The concept may not be clearly explained here. Consider searching online resources or asking a more specific question.`);
       toast({
-        title: "Explain unavailable",
-        description: msg.includes("rate limit") ? msg : "Sign in with a Pro/Creator account or try again later.",
-        variant: "destructive",
+        title: "Explanation unavailable",
+        description: msg.includes("rate limit") || msg.includes("503") ? "AI rate limit exceeded. Please try again in a few minutes." : "Using fallback explanation.",
+        variant: "default",
       });
     } finally {
       setLoadingExplain(false);

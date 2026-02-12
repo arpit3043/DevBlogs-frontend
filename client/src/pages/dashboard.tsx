@@ -4,7 +4,7 @@ import { Navbar } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, DollarSign, MoreHorizontal, Edit2, Eye, Trash2 } from "lucide-react";
+import { FileText, DollarSign, MoreHorizontal, Edit2, Eye, Trash2, FileEdit } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -45,6 +45,14 @@ type DashboardData = {
     title: string;
     view_count: number;
   }[];
+  drafts?: {
+    id: number;
+    slug: string;
+    title: string;
+    updated_at?: string;
+    created_at?: string;
+  }[];
+  draft_count?: number;
 };
 
 export default function Dashboard() {
@@ -162,6 +170,8 @@ export default function Dashboard() {
     total_views: 0,
     total_earnings: 0,
     top_articles: [],
+    drafts: [],
+    draft_count: 0,
   };
 
   return (
@@ -314,6 +324,80 @@ export default function Dashboard() {
             </Table>
           </CardContent>
         </Card>
+
+        {stats.drafts && stats.drafts.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>My Drafts</CardTitle>
+              <CardDescription>
+                Your saved drafts ({stats.draft_count || stats.drafts.length} total).
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Last Updated</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {stats.drafts.map((draft) => (
+                    <TableRow key={draft.id}>
+                      <TableCell className="font-medium flex items-center gap-2">
+                        <FileEdit className="h-4 w-4 text-muted-foreground" />
+                        {draft.title || "Untitled"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {draft.updated_at
+                          ? new Date(draft.updated_at).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })
+                          : draft.created_at
+                          ? new Date(draft.created_at).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link href={`/editor?slug=${draft.slug}`}>
+                                <Edit2 className="h-4 w-4 mr-2" />
+                                Continue editing
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onSelect={(e) => {
+                                e.preventDefault();
+                                setDeleteSlug(draft.slug);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <AlertDialog open={!!deleteSlug} onOpenChange={(open) => !open && setDeleteSlug(null)}>

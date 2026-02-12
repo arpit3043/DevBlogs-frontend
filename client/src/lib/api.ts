@@ -7,6 +7,9 @@ export const API = {
   auth: {
     login: `${API_PREFIX}/auth/login`,
     register: `${API_PREFIX}/auth/register`,
+    googleLogin: `${API_PREFIX}/auth/google-login`,
+    otpSend: `${API_PREFIX}/auth/otp/send`,
+    otpVerify: `${API_PREFIX}/auth/otp/verify`,
     me: `${API_PREFIX}/auth/me`,
     updateMe: `${API_PREFIX}/auth/me`,
   },
@@ -15,6 +18,7 @@ export const API = {
     create: `${API_PREFIX}/articles/`,
     get: (slug: string) => `${API_PREFIX}/articles/${slug}`,
     update: (slug: string) => `${API_PREFIX}/articles/${slug}`,
+    patch: (slug: string) => `${API_PREFIX}/articles/${slug}`,
     delete: (slug: string) => `${API_PREFIX}/articles/${slug}`,
     publish: (slug: string) => `${API_PREFIX}/articles/${slug}/publish`,
     unpublish: (slug: string) => `${API_PREFIX}/articles/${slug}/unpublish`,

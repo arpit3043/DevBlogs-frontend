@@ -25,27 +25,48 @@ function MermaidBlock({ code, onCopy }: { code: string; onCopy?: () => void }) {
     containerRef.current.innerHTML = "";
     const el = document.createElement("div");
     el.id = id;
-    el.setAttribute("data-mermaid", code);
+    el.className = "mermaid";
+    const cleanCode = code.trim();
+    el.textContent = cleanCode;
     containerRef.current.appendChild(el);
 
-    const run = () => {
-      if (window.mermaid) {
-        window.mermaid
-          .run({ querySelector: `#${id}` })
-          .catch((err: Error) => setError(err.message || "Diagram failed to render"));
-      } else {
-        setError("Mermaid not loaded");
+    const run = async () => {
+      try {
+        if (!window.mermaid) {
+          const m = await import("mermaid");
+          window.mermaid = m.default;
+          window.mermaid.initialize({
+            startOnLoad: false,
+            theme: "dark",
+            themeVariables: {
+              primaryColor: "#6366f1",
+              primaryTextColor: "#ffffff",
+              primaryBorderColor: "#818cf8",
+              lineColor: "#a5b4fc",
+              secondaryColor: "#8b5cf6",
+              tertiaryColor: "#ec4899",
+              background: "#1e1e2e",
+              mainBkg: "#27293d",
+              textColor: "#e2e8f0",
+              edgeLabelBackground: "#1e1e2e",
+              clusterBkg: "#312e81",
+              clusterBorder: "#6366f1",
+              defaultLinkColor: "#818cf8",
+              titleColor: "#f1f5f9",
+            },
+            securityLevel: "loose",
+            flowchart: { useMaxWidth: true, htmlLabels: true, curve: "basis" },
+            sequence: { diagramMarginX: 50, diagramMarginY: 10 },
+          });
+        }
+        await window.mermaid.run({ querySelector: `#${id}` });
+      } catch (err: any) {
+        const msg = err?.message || "Diagram failed to render";
+        setError(`Mermaid error: ${msg}. Check your diagram syntax.`);
+        console.error("Mermaid render error:", err);
       }
     };
-    if (typeof window !== "undefined" && window.mermaid) {
-      run();
-    } else {
-      import("mermaid").then((m) => {
-        window.mermaid = m.default;
-        window.mermaid.init({ startOnLoad: false });
-        run();
-      }).catch(() => setError("Mermaid failed to load"));
-    }
+    run();
   }, [code]);
 
   return (
@@ -103,6 +124,17 @@ export function MarkdownRenderer({ content, onCodeCopy }: MarkdownRendererProps)
               ) : null}
               <pre className="p-4 overflow-x-auto pt-10">{children}</pre>
             </div>
+          );
+        },
+        img({ src, alt }) {
+          return (
+            <img
+              src={src}
+              alt={alt}
+              className="max-w-full h-auto rounded-lg my-4 mx-auto"
+              style={{ maxWidth: "100%", height: "auto" }}
+              loading="lazy"
+            />
           );
         },
       }}
