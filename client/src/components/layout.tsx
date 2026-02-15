@@ -26,7 +26,7 @@ export function Navbar() {
         {label: "Explore", href: "/blog"},
         {label: "Write", href: "/editor"},
         {label: "Bookmarks", href: "/bookmarks"},
-        {label: "Profile", href: "/dashboard"},
+        {label: "Profile", href: "/profile"},
     ];
     if (isAuthenticated && user?.role === "admin") {
         navItems.push({label: "Admin", href: "/admin"});

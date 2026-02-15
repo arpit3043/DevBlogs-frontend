@@ -34,11 +34,19 @@ async function throwIfResNotOk(
             status: res.status,
             body: errorBody,
         });
-        // Backend (FastAPI) returns { detail: "..." }; some APIs use { error: "..." }
-        const message =
-            typeof errorBody === "object" && (errorBody?.detail ?? errorBody?.error)
-                ? (errorBody.detail ?? errorBody.error)
-                : res.statusText;
+        // Backend (FastAPI) returns { detail: "..." } or { detail: [{ msg, loc }] } for 422
+        let message = res.statusText;
+        if (typeof errorBody === "object") {
+            const raw = errorBody?.detail ?? errorBody?.error;
+            if (Array.isArray(raw) && raw.length > 0) {
+                const first = raw[0];
+                message = typeof first === "object" && first && "msg" in first
+                    ? String((first as { msg?: string }).msg)
+                    : raw.map((x: any) => (x?.msg ?? x?.message ?? String(x))).join(". ");
+            } else if (raw != null && typeof raw === "string") {
+                message = raw;
+            }
+        }
         const err = new Error(message) as Error & { status?: number; body?: unknown };
         err.status = res.status;
         err.body = errorBody;
@@ -59,7 +67,6 @@ export async function apiRequest(
         headers["Authorization"] = `Bearer ${token}`;
     }
 
-    // Only set Content-Type when sending a body
     if (data !== undefined && method !== "GET") {
         headers["Content-Type"] = "application/json";
     }

@@ -23,7 +23,7 @@ import {
     Underline,
 } from "lucide-react";
 import {useCallback, useEffect, useRef, useState} from "react";
-import {Link} from "wouter";
+import {Link, useLocation} from "wouter";
 import {useToast} from "@/hooks/use-toast";
 import {apiRequest} from "@/lib/queryClient";
 import {API} from "@/lib/api";
@@ -65,6 +65,8 @@ export default function Editor() {
     const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const historyRef = useRef<string[]>([]);
     const historyIndexRef = useRef<number>(-1);
+    const lastSelectionRef = useRef({ start: 0, end: 0 });
+    const [, setLocation] = useLocation();
 
     const getSelection = useCallback((): {
         start: number;
@@ -75,8 +77,10 @@ export default function Editor() {
     } => {
         const ta = contentRef.current;
         if (!ta) return {start: 0, end: 0, text: "", before: "", after: ""};
-        const start = ta.selectionStart;
-        const end = ta.selectionEnd;
+        // When user clicks a toolbar button, textarea loses focus and selection is lost. Use saved selection.
+        const isFocused = typeof document !== "undefined" && document.activeElement === ta;
+        const start = isFocused ? ta.selectionStart : lastSelectionRef.current.start;
+        const end = isFocused ? ta.selectionEnd : lastSelectionRef.current.end;
         const text = content.slice(start, end);
         return {start, end, text, before: content.slice(0, start), after: content.slice(end)};
     }, [content]);
@@ -300,11 +304,11 @@ export default function Editor() {
                 throw new Error(detail);
             }
             setArticleStatus("published");
-            setViewMode("preview");
             toast({
                 title: "Published",
-                description: "Your article is now live.",
+                description: "Your article is now live. Taking you to the article.",
             });
+            setLocation(`/blog/${slug}`);
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : "Could not publish";
             toast({
@@ -487,55 +491,67 @@ export default function Editor() {
                 {/* Toolbar - all buttons wired to markdown */}
                 <div
                     className="flex items-center gap-1 p-2 bg-secondary/30 rounded-lg border border-border sticky top-20 z-10 backdrop-blur-sm">
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleBold}
-                            title="Bold">
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="Bold"
+                            onMouseDown={(e) => { e.preventDefault(); lastSelectionRef.current = { start: contentRef.current?.selectionStart ?? 0, end: contentRef.current?.selectionEnd ?? 0 }; }}
+                            onClick={handleBold}>
                         <Bold className="h-4 w-4"/>
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleItalic}
-                            title="Italic">
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="Italic"
+                            onMouseDown={(e) => { e.preventDefault(); lastSelectionRef.current = { start: contentRef.current?.selectionStart ?? 0, end: contentRef.current?.selectionEnd ?? 0 }; }}
+                            onClick={handleItalic}>
                         <Italic className="h-4 w-4"/>
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleUnderline}
-                            title="Underline">
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="Underline"
+                            onMouseDown={(e) => { e.preventDefault(); lastSelectionRef.current = { start: contentRef.current?.selectionStart ?? 0, end: contentRef.current?.selectionEnd ?? 0 }; }}
+                            onClick={handleUnderline}>
                         <Underline className="h-4 w-4"/>
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleLink}
-                            title="Link">
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="Link"
+                            onMouseDown={(e) => { e.preventDefault(); lastSelectionRef.current = { start: contentRef.current?.selectionStart ?? 0, end: contentRef.current?.selectionEnd ?? 0 }; }}
+                            onClick={handleLink}>
                         <LinkIcon className="h-4 w-4"/>
                     </Button>
                     <div className="w-px h-4 bg-border mx-1"/>
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleCode}
-                            title="Code">
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="Code"
+                            onMouseDown={(e) => { e.preventDefault(); lastSelectionRef.current = { start: contentRef.current?.selectionStart ?? 0, end: contentRef.current?.selectionEnd ?? 0 }; }}
+                            onClick={handleCode}>
                         <Code className="h-4 w-4"/>
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleImage}
-                            title="Image (URL)">
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="Image (URL)"
+                            onMouseDown={(e) => { e.preventDefault(); lastSelectionRef.current = { start: contentRef.current?.selectionStart ?? 0, end: contentRef.current?.selectionEnd ?? 0 }; }}
+                            onClick={handleImage}>
                         <ImageIcon className="h-4 w-4"/>
                     </Button>
                     <div className="w-px h-4 bg-border mx-1"/>
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleBlockquote}
-                            title="Blockquote">
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="Blockquote"
+                            onMouseDown={(e) => { e.preventDefault(); lastSelectionRef.current = { start: contentRef.current?.selectionStart ?? 0, end: contentRef.current?.selectionEnd ?? 0 }; }}
+                            onClick={handleBlockquote}>
                         <Quote className="h-4 w-4"/>
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleH1}
-                            title="Heading 1">
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="Heading 1"
+                            onMouseDown={(e) => { e.preventDefault(); lastSelectionRef.current = { start: contentRef.current?.selectionStart ?? 0, end: contentRef.current?.selectionEnd ?? 0 }; }}
+                            onClick={handleH1}>
                         <Heading1 className="h-4 w-4"/>
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleH2}
-                            title="Heading 2">
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="Heading 2"
+                            onMouseDown={(e) => { e.preventDefault(); lastSelectionRef.current = { start: contentRef.current?.selectionStart ?? 0, end: contentRef.current?.selectionEnd ?? 0 }; }}
+                            onClick={handleH2}>
                         <Heading2 className="h-4 w-4"/>
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleH3}
-                            title="Heading 3">
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="Heading 3"
+                            onMouseDown={(e) => { e.preventDefault(); lastSelectionRef.current = { start: contentRef.current?.selectionStart ?? 0, end: contentRef.current?.selectionEnd ?? 0 }; }}
+                            onClick={handleH3}>
                         <Heading3 className="h-4 w-4"/>
                     </Button>
                     <div className="w-px h-4 bg-border mx-1"/>
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleUnorderedList}
-                            title="Bullet list">
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="Bullet list"
+                            onMouseDown={(e) => { e.preventDefault(); lastSelectionRef.current = { start: contentRef.current?.selectionStart ?? 0, end: contentRef.current?.selectionEnd ?? 0 }; }}
+                            onClick={handleUnorderedList}>
                         <List className="h-4 w-4"/>
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={handleOrderedList}
-                            title="Numbered list">
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" title="Numbered list"
+                            onMouseDown={(e) => { e.preventDefault(); lastSelectionRef.current = { start: contentRef.current?.selectionStart ?? 0, end: contentRef.current?.selectionEnd ?? 0 }; }}
+                            onClick={handleOrderedList}>
                         <ListOrdered className="h-4 w-4"/>
                     </Button>
 
@@ -673,6 +689,10 @@ export default function Editor() {
                         ref={contentRef}
                         value={content}
                         onChange={(e) => setContent(e.target.value)}
+                        onBlur={() => {
+                            if (contentRef.current)
+                                lastSelectionRef.current = { start: contentRef.current.selectionStart, end: contentRef.current.selectionEnd };
+                        }}
                         onKeyDown={(e) => {
                             const mod = e.metaKey || e.ctrlKey;
                             if (!mod) return;

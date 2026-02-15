@@ -15,6 +15,7 @@ import Register from "@/pages/register";
 import Admin from "@/pages/admin";
 import Bookmarks from "@/pages/bookmarks";
 import GettingStarted from "@/pages/getting-started";
+import Profile from "@/pages/profile";
 
 function Router() {
     return (
@@ -22,6 +23,7 @@ function Router() {
             <Route path="/" component={Home}/>
             <Route path="/login" component={Login}/>
             <Route path="/register" component={Register}/>
+            <Route path="/profile" component={Profile}/>
             <Route path="/dashboard" component={Dashboard}/>
             <Route path="/editor" component={Editor}/>
             <Route path="/blog" component={BlogList}/>
