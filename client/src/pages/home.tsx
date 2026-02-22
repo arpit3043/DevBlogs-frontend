@@ -7,7 +7,6 @@ import heroImage from "@/assets/hero-tech.png";
 import {Bookmark, Check, ChevronDown, Cpu, LineChart, Search, Share2, Sparkles, Terminal} from "lucide-react";
 import {Link, useLocation} from "wouter";
 import {useAuth} from "@/hooks/useAuth";
-import {useToast} from "@/hooks/use-toast";
 import {apiRequest} from "@/lib/queryClient";
 import {API} from "@/lib/api";
 
@@ -25,8 +24,6 @@ type ArticleItem = {
 
 export default function Home() {
     const {isAuthenticated} = useAuth();
-    const {toast} = useToast();
-    const [subscribing, setSubscribing] = useState<string | null>(null);
     const [feedArticles, setFeedArticles] = useState<ArticleItem[]>([]);
     const [upNext, setUpNext] = useState<ArticleItem[]>([]);
     const [feedLoading, setFeedLoading] = useState(true);
@@ -43,19 +40,6 @@ export default function Home() {
             })
             .finally(() => setFeedLoading(false));
     }, []);
-
-    const handleSubscribe = async (plan: string) => {
-        if (!isAuthenticated) return;
-        setSubscribing(plan);
-        try {
-            await apiRequest("POST", API.billing.subscribe, {plan});
-            toast({title: "Subscribed", description: `You're now on the ${plan} plan.`});
-        } catch (error) {
-            toast({title: "Subscription failed", variant: "destructive"});
-        } finally {
-            setSubscribing(null);
-        }
-    };
 
     const formatTime = (dateStr: string | null) => {
         if (!dateStr) return "";
@@ -417,10 +401,9 @@ export default function Home() {
                             </CardContent>
                             <CardFooter>
                                 {isAuthenticated ? (
-                                    <Button className="w-full" disabled={subscribing !== null}
-                                            onClick={() => handleSubscribe("pro")}>
-                                        {subscribing === "pro" ? "Subscribing…" : "Start Pro Trial"}
-                                    </Button>
+                                    <Link href="/payment">
+                                        <Button className="w-full">Start Pro Trial</Button>
+                                    </Link>
                                 ) : (
                                     <Link href="/login">
                                         <Button className="w-full">Start Pro Trial</Button>
@@ -455,10 +438,9 @@ export default function Home() {
                             </CardContent>
                             <CardFooter>
                                 {isAuthenticated ? (
-                                    <Button variant="outline" className="w-full" disabled={subscribing !== null}
-                                            onClick={() => handleSubscribe("creator")}>
-                                        {subscribing === "creator" ? "Subscribing…" : "Upgrade to Team"}
-                                    </Button>
+                                    <Link href="/payment">
+                                        <Button variant="outline" className="w-full">Upgrade to Team</Button>
+                                    </Link>
                                 ) : (
                                     <Link href="/register">
                                         <Button variant="outline" className="w-full">Contact Sales</Button>

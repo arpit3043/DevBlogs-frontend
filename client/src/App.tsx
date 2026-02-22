@@ -16,11 +16,13 @@ import Admin from "@/pages/admin";
 import Bookmarks from "@/pages/bookmarks";
 import GettingStarted from "@/pages/getting-started";
 import Profile from "@/pages/profile";
+import Payment from "@/pages/payment";
 
 function Router() {
     return (
         <Switch>
             <Route path="/" component={Home}/>
+            <Route path="/payment" component={Payment}/>
             <Route path="/login" component={Login}/>
             <Route path="/register" component={Register}/>
             <Route path="/profile" component={Profile}/>

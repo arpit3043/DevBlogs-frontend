@@ -40,6 +40,9 @@ export const API = {
         upgrade: `${API_PREFIX}/billing/upgrade`,
         portal: `${API_PREFIX}/billing/portal`,
         status: `${API_PREFIX}/billing/status`,
+        createOrder: `${API_PREFIX}/billing/create-order`,
+        verifyPayment: `${API_PREFIX}/billing/verify-payment`,
+        plans: `${API_PREFIX}/billing/plans`,
     },
     analytics: {
         articleStats: (id: number) => `${API_PREFIX}/analytics/article/${id}`,

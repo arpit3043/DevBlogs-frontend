@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from "react";
+import React, {useEffect, useRef, useState} from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -8,8 +8,9 @@ import "highlight.js/styles/github-dark.min.css";
 declare global {
     interface Window {
         mermaid?: {
-            run: (options?: { nodes?: Node[]; querySelector?: string }) => Promise<void>;
+            run: (options?: { querySelector?: string; nodes?: unknown }) => Promise<void>;
             init: (config?: object) => void;
+            initialize: (config?: object) => void;
         };
     }
 }
@@ -34,8 +35,8 @@ function MermaidBlock({code, onCopy}: { code: string; onCopy?: () => void }) {
             try {
                 if (!window.mermaid) {
                     const m = await import("mermaid");
-                    window.mermaid = m.default;
-                    window.mermaid.initialize({
+                    window.mermaid = m.default as Window["mermaid"];
+                    window.mermaid?.initialize?.({
                         startOnLoad: false,
                         theme: "dark",
                         themeVariables: {
@@ -59,7 +60,7 @@ function MermaidBlock({code, onCopy}: { code: string; onCopy?: () => void }) {
                         sequence: {diagramMarginX: 50, diagramMarginY: 10},
                     });
                 }
-                await window.mermaid.run({querySelector: `#${id}`});
+                await window.mermaid?.run({querySelector: `#${id}`});
             } catch (err: any) {
                 const msg = err?.message || "Diagram failed to render";
                 setError(`Mermaid error: ${msg}. Check your diagram syntax.`);
@@ -97,9 +98,9 @@ export function MarkdownRenderer({content, onCodeCopy}: MarkdownRendererProps) {
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeRaw, rehypeHighlight]}
             components={{
-                pre({children}) {
+                pre({children, className}: { children?: React.ReactNode; className?: string }) {
                     const child = Array.isArray(children) ? children[0] : children;
-                    const codeProps = typeof child === "object" && child !== null && "props" in child ? (child as React.ReactElement).props : null;
+                    const codeProps = typeof child === "object" && child !== null && "props" in child ? (child as React.ReactElement<{ className?: string; children?: React.ReactNode }>).props : {} as { className?: string; children?: React.ReactNode };
                     const lang = codeProps?.className?.match(/language-(\w+)/)?.[1];
                     const code = typeof codeProps?.children === "string" ? codeProps.children : String(codeProps?.children ?? "");
                     if (lang === "mermaid" && code) {
