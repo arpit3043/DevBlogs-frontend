@@ -79,14 +79,29 @@ export async function apiRequest(
         hasToken: !!token,
     });
 
-    const res = await fetch(fullUrl, {
-        method,
-        headers,
-        body:
-            data !== undefined && method !== "GET"
-                ? JSON.stringify(data)
-                : undefined,
-    });
+    let res: Response;
+    try {
+        res = await fetch(fullUrl, {
+            method,
+            headers,
+            credentials: "include",
+            body:
+                data !== undefined && method !== "GET"
+                    ? JSON.stringify(data)
+                    : undefined,
+        });
+    } catch (err) {
+        const message =
+            err instanceof Error ? err.message : "Network request failed";
+        logger.error("API network error", {
+            method,
+            url: fullUrl,
+            error: message,
+        });
+        throw new Error(
+            `Cannot reach server. Check your connection and that VITE_API_URL (${API_BASE_URL}) is correct.`
+        );
+    }
 
     await throwIfResNotOk(res, {method, url: fullUrl});
     return res;
